@@ -1,0 +1,45 @@
+name: CI - ML Pipeline Validation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Test ML Pipeline
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python & dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || echo "requirements.txt não encontrado, seguindo..."
+          pip install notebook nbconvert pytest numpy scikit-learn
+
+      - name: Download official tests
+        uses: actions/checkout@v3
+        with:
+          repository: ddefbcourses/ml-course-tests
+          path: official-tests
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Override student tests
+        run: |
+          rm -rf assignments/E02/tests
+          cp -r official-tests/assignments/E02/tests assignments/E02/
+
+      - name: Convert notebook to Python script
+        run: |
+          jupyter nbconvert assignments/E02/E02_Ensemble_Learning.ipynb \
+            --to python \
+            --output notebook.py \
+            --output-dir .
+          echo "Notebook convertido para notebook.py"
+
+      - name: Run tests
+        run: |
+          echo "Iniciando execução dos testes..."
+          pytest assignments/E02/tests -v --maxfail=3 --disable-warnings || exit 1
